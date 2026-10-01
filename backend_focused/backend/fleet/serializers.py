@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 
 from fleet.models import MaintenanceRecord, Mechanic, Office, Vehicle
 
@@ -22,6 +23,17 @@ class VehicleSerializer(serializers.ModelSerializer):
             "office",
             "is_active",
         ]
+        validators = []
+
+    def get_fields(self):
+        fields = super().get_fields()
+        plate = fields["license_plate"]
+        plate.validators = [
+            validator
+            for validator in plate.validators
+            if not isinstance(validator, UniqueValidator)
+        ]
+        return fields
 
     def validate(self, attrs):
         license_plate = attrs.get(
@@ -107,7 +119,10 @@ class VehicleDetailSerializer(serializers.ModelSerializer):
 
 
 class VehicleMaintenanceStatusSerializer(VehicleSerializer):
-    last_maintenance = serializers.DateField(allow_null=True)
+    last_maintenance = serializers.DateField(allow_null=True, read_only=True)
+
+    class Meta(VehicleSerializer.Meta):
+        fields = VehicleSerializer.Meta.fields + ["last_maintenance"]
 
 
 class AssignOfficeSerializer(serializers.Serializer):
