@@ -62,3 +62,59 @@ class MaintenanceRecordSerializer(serializers.ModelSerializer):
             "cost",
             "notes",
         ]
+
+
+class OfficeSummarySerializer(serializers.Serializer):
+    name = serializers.CharField()
+    city = serializers.CharField()
+    active_vehicle_count = serializers.IntegerField()
+    maintenance_cost_last_year = serializers.DecimalField(max_digits=14, decimal_places=2)
+    last_maintenance = serializers.DateField(allow_null=True)
+
+
+class MaintenanceDetailSerializer(serializers.ModelSerializer):
+    mechanic = MechanicSerializer(read_only=True)
+
+    class Meta:
+        model = MaintenanceRecord
+        fields = [
+            "id",
+            "maintenance_date",
+            "maintenance_type",
+            "cost",
+            "notes",
+            "mechanic",
+        ]
+
+
+class VehicleDetailSerializer(serializers.ModelSerializer):
+    office = OfficeSerializer(read_only=True)
+    maintenance_records = MaintenanceDetailSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Vehicle
+        fields = [
+            "id",
+            "vin",
+            "license_plate",
+            "make",
+            "model",
+            "year",
+            "office",
+            "is_active",
+            "maintenance_records",
+        ]
+
+
+class VehicleMaintenanceStatusSerializer(VehicleSerializer):
+    last_maintenance = serializers.DateField(allow_null=True)
+
+
+class AssignOfficeSerializer(serializers.Serializer):
+    office = serializers.PrimaryKeyRelatedField(queryset=Office.objects.all())
+
+
+class MechanicWorkloadSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    maintenance_count = serializers.IntegerField()
+    maintenance_cost = serializers.DecimalField(max_digits=14, decimal_places=2)
