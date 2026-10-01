@@ -14,6 +14,6 @@ export function useBrokerOptions() {
   return useQuery({
     queryKey: ['brokers'],
     queryFn: fetchBrokers,
-    enabled: false,
+    staleTime: 5 * 60_000,
   });
 }
