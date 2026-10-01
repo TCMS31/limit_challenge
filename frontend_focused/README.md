@@ -28,8 +28,10 @@ Required entities (already defined in `submissions/models.py`):
 - `Document`: references to supporting files
 - `Note`: threaded context for collaboration
 
-Seed data (~25 submissions with dozens of related contacts, documents, and notes) is available via
-`python manage.py seed_submissions`. Re-run with `--force` to rebuild the dataset.
+Seed data is a fixed set of 25 submissions (with contacts, documents, and notes) loaded by
+`python manage.py seed_submissions`. Re-run with `--force` to rebuild it. Dates start at
+2025-11-01. Useful checks: company search `Acme` or `Health`, broker Harbor & Co Brokerage,
+the 2025-11-01 submission has no contacts, 2025-11-02 has no documents, and 2025-11-03 has no notes.
 
 ## API Requirements
 
@@ -92,6 +94,8 @@ python manage.py seed_submissions  # optional but recommended
 python manage.py runserver 0.0.0.0:8000
 ```
 
+Open the API at `http://localhost:8000/api/submissions/` (use `localhost`, not `0.0.0.0`).
+
 ### Frontend
 
 ```bash
@@ -103,6 +107,24 @@ npm run dev
 ```
 
 Visit `http://localhost:3000/submissions` to start building.
+
+### Docker
+
+Compose runs Postgres, the API, and the Next.js dev server. The browser still calls the API at
+`http://localhost:8000/api`. The first start migrates and seeds; later starts leave existing rows
+in place. Copy `.env.example` to `.env` if you want to override the defaults.
+
+```bash
+docker compose up --build
+```
+
+Rebuild the dataset inside the backend container:
+
+```bash
+docker compose exec backend python manage.py seed_submissions --force
+```
+
+Local `manage.py` continues to use SQLite and does not need Postgres.
 
 ## Development Workflow
 

@@ -12,6 +12,7 @@ greenlet==3.1.0
 lxml==5.3.1
 msgpack==1.1.0
 packaging==24.2
+psycopg[binary]==3.2.9
 pikepdf==9.5.2
 pillow==11.1.0
 platformdirs==4.3.6
