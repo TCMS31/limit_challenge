@@ -159,6 +159,24 @@ Validation errors should include meaningful messages.
 
 ## Getting Started
 
+### Docker
+
+Docker Compose runs Postgres, the Django API, and the Next.js app. From this directory:
+
+```bash
+docker compose up --build
+```
+
+- API: `http://localhost:8000/healthz/`
+- Frontend: `http://localhost:3000`
+- Postgres: `localhost:5432` (database, user, and password all default to `fleet`)
+
+Source directories are bind-mounted, so code edits apply without a rebuild. Rebuild after changing `backend/requirements.txt` or `frontend/package-lock.json`.
+
+Copy `.env.example` to `.env` to override ports' defaults, the Django secret, or the API URL the browser calls (`NEXT_PUBLIC_API_BASE_URL`). That URL must stay on `localhost` from the browser's point of view, not the Compose service name.
+
+Without `POSTGRES_HOST`, Django still uses SQLite so the venv workflow below keeps working.
+
 ### Backend
 
 ```bash
