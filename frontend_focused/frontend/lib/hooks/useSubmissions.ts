@@ -1,6 +1,7 @@
 'use client';
 
 import { keepPreviousData, QueryKey, useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 
 import { apiClient } from '@/lib/api-client';
 import {
@@ -45,9 +46,13 @@ export function useSubmissionsList(filters: SubmissionListFilters) {
 
 export function useSubmissionDetail(id: string | number) {
   return useQuery({
-    queryKey: [SUBMISSIONS_QUERY_KEY, id],
+    queryKey: [SUBMISSIONS_QUERY_KEY, 'detail', id],
     queryFn: () => fetchSubmissionDetail(id),
-    enabled: false,
+    enabled: Boolean(id),
     staleTime: 60_000,
+    retry: (failureCount, error) => {
+      if (axios.isAxiosError(error) && error.response?.status === 404) return false;
+      return failureCount < 1;
+    },
   });
 }
