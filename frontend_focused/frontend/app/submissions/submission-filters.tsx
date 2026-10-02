@@ -36,7 +36,12 @@ export default function SubmissionFilters({
   onCompanyInputChange,
 }: SubmissionFiltersProps) {
   return (
-    <Card variant="outlined">
+    <Card
+      variant="outlined"
+      sx={{
+        '&:hover': { boxShadow: 2, borderColor: 'primary.light' },
+      }}
+    >
       <CardContent>
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
           <TextField
@@ -82,8 +87,8 @@ export default function SubmissionFilters({
             value={companyInput}
             onChange={(event) => onCompanyInputChange(event.target.value)}
             fullWidth
-            placeholder="Acme, Health…"
-            helperText="Matches the company name"
+            placeholder="Acme, Manufacturing, Hospitality…"
+            helperText="Matches the company name or industry"
           />
         </Stack>
       </CardContent>

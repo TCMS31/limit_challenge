@@ -4,6 +4,7 @@ import { Alert, Box, Button, Card, CardContent, Container, Stack, Typography } f
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 
+import { downloadSubmissionsCsv } from '@/lib/export-submissions';
 import { useBrokerOptions } from '@/lib/hooks/useBrokerOptions';
 import { useSubmissionsList } from '@/lib/hooks/useSubmissions';
 import { isStatus } from '@/lib/submission-display';
@@ -26,6 +27,7 @@ export default function SubmissionsWorkspace() {
   const page = Math.max(1, Number(searchParams.get('page') ?? '1') || 1);
 
   const [companyInput, setCompanyInput] = useState(companySearch);
+  const [exporting, setExporting] = useState(false);
   const [trackedSearch, setTrackedSearch] = useState(companySearch);
   if (companySearch !== trackedSearch) {
     setTrackedSearch(companySearch);
@@ -114,8 +116,26 @@ export default function SubmissionsWorkspace() {
           onCompanyInputChange={setCompanyInput}
         />
 
-        <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
-          <Typography color="text.secondary">{rangeLabel}</Typography>
+        <Stack direction="row" spacing={2} alignItems="center" justifyContent="flex-end">
+          {submissionsQuery.isLoading ? (
+            <Typography color="text.secondary" sx={{ mr: 'auto' }}>
+              Loading submissions…
+            </Typography>
+          ) : null}
+          <Button
+            variant="outlined"
+            disabled={exporting || submissionsQuery.isLoading || total === 0}
+            onClick={() => {
+              setExporting(true);
+              void downloadSubmissionsCsv({
+                status: status || undefined,
+                brokerId: brokerId || undefined,
+                companySearch: companySearch || undefined,
+              }).finally(() => setExporting(false));
+            }}
+          >
+            {exporting ? 'Exporting…' : 'Export CSV'}
+          </Button>
           {hasFilters ? (
             <Button
               onClick={() => {
@@ -166,6 +186,12 @@ export default function SubmissionsWorkspace() {
               replaceParams({ page: nextPage > 1 ? String(nextPage) : undefined })
             }
           />
+        ) : null}
+
+        {submissionsQuery.isSuccess && total > 0 ? (
+          <Typography color="text.secondary" textAlign="right">
+            {rangeLabel}
+          </Typography>
         ) : null}
       </Stack>
     </Container>

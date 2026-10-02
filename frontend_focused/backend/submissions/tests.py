@@ -1,6 +1,7 @@
 import json
 from datetime import datetime, timedelta, timezone
 
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -10,6 +11,8 @@ from submissions import models
 
 class SubmissionApiTests(APITestCase):
     def setUp(self):
+        user = get_user_model().objects.create_user(username="submission", password="submission-demo")
+        self.client.force_authenticate(user=user)
         self.harbor = models.Broker.objects.create(
             name="Harbor & Co Brokerage",
             primary_contact_email="ops@harbor-co.example",
@@ -124,6 +127,24 @@ class SubmissionApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(self._ids(response), {self.with_files.id, self.no_documents.id})
 
+    def test_export_csv_respects_company_search(self):
+        response = self.client.get("/api/submissions/export/", {"companySearch": "manufacturing"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("text/csv", response["Content-Type"])
+        body = response.content.decode()
+        self.assertIn("Acme Industrial LLC", body)
+        self.assertIn("Acme Components Ltd", body)
+        self.assertIn("Created at", body)
+        self.assertIn("Nov 1, 2025", body)
+        self.assertNotIn("Brightpath Health", body)
+
+    def test_company_search_matches_industry(self):
+        response = self.client.get(reverse("submission-list"), {"companySearch": "manufacturing"})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(self._ids(response), {self.with_files.id, self.no_documents.id})
+
     def test_created_range_includes_the_end_date(self):
         response = self.client.get(
             reverse("submission-list"),
@@ -188,3 +209,58 @@ class ApiDocsTests(APITestCase):
         response = self.client.get("/api/docs/")
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class AuthenticationTests(APITestCase):
+    def setUp(self):
+        get_user_model().objects.create_user(username="submission", password="submission-demo")
+
+    def test_submissions_require_a_token(self):
+        response = self.client.get("/api/submissions/")
+
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_health_and_docs_stay_public(self):
+        health = self.client.get("/healthz/")
+        docs = self.client.get("/api/docs/")
+
+        self.assertEqual(health.status_code, status.HTTP_200_OK)
+        self.assertEqual(docs.status_code, status.HTTP_200_OK)
+
+    def test_login_puts_refresh_in_a_cookie(self):
+        response = self.client.post(
+            "/api/auth/token/",
+            {"username": "submission", "password": "submission-demo"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertNotIn("refresh", response.data)
+        self.assertIn("submission_refresh", response.cookies)
+        self.assertTrue(response.cookies["submission_refresh"]["httponly"])
+
+    def test_refresh_rotates_the_cookie_and_logout_clears_it(self):
+        login = self.client.post(
+            "/api/auth/token/",
+            {"username": "submission", "password": "submission-demo"},
+            format="json",
+        )
+        first_refresh = login.cookies["submission_refresh"].value
+
+        refreshed = self.client.post("/api/auth/token/refresh/")
+
+        self.assertEqual(refreshed.status_code, status.HTTP_200_OK)
+        self.assertIn("access", refreshed.data)
+        self.assertNotIn("refresh", refreshed.data)
+        rotated = refreshed.cookies["submission_refresh"].value
+        self.assertNotEqual(rotated, first_refresh)
+
+        self.client.cookies["submission_refresh"] = first_refresh
+        reused = self.client.post("/api/auth/token/refresh/")
+        self.assertEqual(reused.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        self.client.cookies["submission_refresh"] = rotated
+        logout = self.client.post("/api/auth/logout/")
+        self.assertEqual(logout.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(logout.cookies["submission_refresh"].value, "")

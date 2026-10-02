@@ -1,5 +1,5 @@
 import django_filters
-from django.db.models import Exists, OuterRef
+from django.db.models import Exists, OuterRef, Q
 
 from submissions import models
 
@@ -9,10 +9,7 @@ class SubmissionFilterSet(django_filters.FilterSet):
 
     status = django_filters.CharFilter(field_name="status", lookup_expr="iexact")
     brokerId = django_filters.NumberFilter(field_name="broker_id")
-    companySearch = django_filters.CharFilter(
-        field_name="company__legal_name",
-        lookup_expr="icontains",
-    )
+    companySearch = django_filters.CharFilter(method="filter_company_search")
     createdFrom = django_filters.DateFilter(field_name="created_at", lookup_expr="date__gte")
     createdTo = django_filters.DateFilter(field_name="created_at", lookup_expr="date__lte")
     hasDocuments = django_filters.BooleanFilter(method="filter_has_documents")
@@ -21,6 +18,13 @@ class SubmissionFilterSet(django_filters.FilterSet):
     class Meta:
         model = models.Submission
         fields = []
+
+    def filter_company_search(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(company__legal_name__icontains=value) | Q(company__industry__icontains=value)
+        )
 
     def filter_has_documents(self, queryset, name, value):
         return self._filter_has_related(queryset, models.Document, "has_documents", value)

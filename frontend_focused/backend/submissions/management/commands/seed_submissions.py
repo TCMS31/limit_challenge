@@ -1,3 +1,4 @@
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
@@ -16,6 +17,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        self._ensure_demo_user(reset_password=options["force"])
         with transaction.atomic():
             if models.Submission.objects.exists():
                 if not options["force"]:
@@ -42,6 +44,14 @@ class Command(BaseCommand):
                 f"{counts['submissions']} submissions, "
                 f"{counts['contacts']} contacts, "
                 f"{counts['documents']} documents, "
-                f"{counts['notes']} notes."
+                f"{counts['notes']} notes. Sign in as submission / submission-demo."
             )
         )
+
+    def _ensure_demo_user(self, *, reset_password):
+        user_model = get_user_model()
+        user, created = user_model.objects.get_or_create(username="submission")
+        if created or reset_password:
+            user.set_password("submission-demo")
+            user.save(update_fields=["password"])
+        self.stdout.write("Demo sign-in: submission / submission-demo")

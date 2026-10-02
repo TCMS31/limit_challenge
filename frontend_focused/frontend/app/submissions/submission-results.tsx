@@ -51,7 +51,21 @@ export default function SubmissionResults({
   const currentPage = Math.min(page, pageCount);
 
   return (
-    <Box sx={{ opacity: isFetching ? 0.65 : 1 }}>
+    <Box
+      sx={{
+        opacity: isFetching ? 0.65 : 1,
+        transition: 'opacity 180ms ease',
+        '@keyframes rise': {
+          from: { opacity: 0, transform: 'translateY(8px)' },
+          to: { opacity: 1, transform: 'none' },
+        },
+        animation: 'rise 280ms ease',
+        '@media (prefers-reduced-motion: reduce)': {
+          animation: 'none',
+          transition: 'none',
+        },
+      }}
+    >
       <Box sx={{ display: { xs: 'none', md: 'block' } }}>
         <TableContainer component={Card} variant="outlined">
           <Table>
@@ -75,10 +89,20 @@ export default function SubmissionResults({
                   key={submission.id}
                   hover
                   onClick={() => router.push(detailHref(submission.id))}
-                  sx={{ cursor: 'pointer' }}
+                  sx={{
+                    cursor: 'pointer',
+                    transition: 'background-color 160ms ease',
+                    '&:hover .company-name': { color: 'primary.main' },
+                    '&:hover .open-link': { transform: 'translateX(4px)' },
+                  }}
                 >
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                    <Typography variant="body2" fontWeight={600}>
+                    <Typography
+                      className="company-name"
+                      variant="body2"
+                      fontWeight={600}
+                      sx={{ transition: 'color 160ms ease' }}
+                    >
                       {submission.company.legalName}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -112,11 +136,13 @@ export default function SubmissionResults({
                   </TableCell>
                   <TableCell sx={{ whiteSpace: 'nowrap' }}>
                     <MuiLink
+                      className="open-link"
                       component={Link}
                       href={detailHref(submission.id)}
                       underline="hover"
                       fontWeight={600}
                       onClick={(event) => event.stopPropagation()}
+                      sx={{ display: 'inline-block', transition: 'transform 160ms ease' }}
                     >
                       Open
                     </MuiLink>
@@ -130,7 +156,11 @@ export default function SubmissionResults({
 
       <Stack spacing={2} sx={{ display: { xs: 'flex', md: 'none' } }}>
         {submissions.map((submission) => (
-          <Card key={submission.id} variant="outlined">
+          <Card
+            key={submission.id}
+            variant="outlined"
+            sx={{ '&:hover': { transform: 'translateY(-2px)', boxShadow: 3 } }}
+          >
             <CardActionArea component={Link} href={detailHref(submission.id)}>
               <CardContent>
                 <SubmissionCard submission={submission} />

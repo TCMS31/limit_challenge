@@ -14,6 +14,7 @@ docker compose up --build
 
 That starts Postgres, the API, and the Next.js dev server. On the first start the backend waits for the database, runs migrations, and loads the seed. Later starts keep the existing rows.
 
+- Sign in: `http://localhost:3000/login` with `submission` / `submission-demo`
 - App: `http://localhost:3000/submissions`
 - API: `http://localhost:8000/api/submissions/`
 - Swagger: `http://localhost:8000/api/docs/`
@@ -58,7 +59,7 @@ cd backend
 
 **List API.** `GET /api/submissions/` is paginated, 10 per page, newest first. Each row includes the company, broker, owner, document count, note count, and the latest note preview. The query uses `select_related` for company, broker, and owner, and annotates the counts and latest note so the list does not load every related row.
 
-**Required filters.** `status`, `brokerId`, and `companySearch` are query params. `companySearch` is a case-insensitive match on the company legal name. Empty params are omitted. Unknown params are ignored.
+**Required filters.** `status`, `brokerId`, and `companySearch` are query params. `companySearch` is a case-insensitive match on the company legal name or industry. **Export CSV** downloads every row matching the current filters, not only the page on screen. The request uses the signed-in access token. Empty params are omitted. Unknown params are ignored.
 
 **Detail API.** `GET /api/submissions/<id>/` returns the submission plus contacts, documents, and notes. That query uses `prefetch_related` for those three collections. A missing id returns 404.
 
@@ -79,7 +80,7 @@ These are implemented beyond the three list filters:
 - Docker Compose and the deterministic seed.
 - Swagger UI at `/api/docs/` and ReDoc at `/api/redoc/`. The schema uses the same camelCase names as the JSON responses.
 
-Authentication and deployment were left out.
+- Sign-in uses SimpleJWT. The access token lasts 15 minutes and stays in memory. The refresh token lasts one day in the httpOnly cookie `submission_refresh`. `POST /api/auth/token/refresh/` rotates it. `POST /api/auth/logout/` blacklists it. `/healthz/`, `/api/docs/`, and `/admin/` stay public. Every other `/api/` route requires the bearer token.
 
 ## Approach
 
