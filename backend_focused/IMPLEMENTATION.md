@@ -57,6 +57,8 @@ Filters for office, active status, and maintenance dates update the URL immediat
 
 The UI does not create offices, mechanics, or maintenance records, and it has no delete button. Those operations are on the API and in Django admin.
 
+Walkthrough: https://www.loom.com/share/d9d1e8c4c46445dbb46884dddd34258a
+
 ### Seed data
 
 `python manage.py seed_fleet` fills the database with Faker. Defaults: 8 offices, 150 vehicles, 25 mechanics, and one vehicle with 400 maintenance records so the detail endpoint can be checked under load. `--seed 42` keeps names stable. `--clear` wipes fleet rows and reloads them. The command refuses to run when fleet rows already exist unless `--clear` is passed.

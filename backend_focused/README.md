@@ -192,7 +192,8 @@ The sections above are the challenge. This section is what was built. How to run
 - Validation errors with HTTP status codes.
 - Faker seed command: `python manage.py seed_fleet`. Demo API login is `fleet` / `fleet-demo`.
 - API tests in `fleet/tests.py`.
-- Frontend for vehicle search, create, edit, assign, and needs-maintenance.
+- Frontend for vehicle search, create, edit, assign, and needs-maintenance. Walkthrough: 
+https://www.loom.com/share/d9d1e8c4c46445dbb46884dddd34258a
 - Optional JWT. The access token lasts 15 minutes and stays in memory. The refresh token lasts 1 day in the `httpOnly` cookie `fleet_refresh`.
 
 ### Also included
