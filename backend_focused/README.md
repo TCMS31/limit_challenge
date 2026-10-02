@@ -157,47 +157,6 @@ Validation errors should include meaningful messages.
 - `backend/`: Empty Django project.
 - `frontend/`: Empty Next.js app.
 
-## Getting Started
-
-### Docker
-
-Docker Compose runs Postgres, the Django API, and the Next.js app. From this directory:
-
-```bash
-docker compose up --build
-```
-
-- API: `http://localhost:8000/healthz/`
-- Frontend: `http://localhost:3000`
-- Postgres: `localhost:5432` (database, user, and password all default to `fleet`)
-
-Source directories are bind-mounted, so code edits apply without a rebuild. Rebuild after changing `backend/requirements.txt` or `frontend/package-lock.json`.
-
-Copy `.env.example` to `.env` to override ports' defaults, the Django secret, or the API URL the browser calls (`NEXT_PUBLIC_API_BASE_URL`). That URL must stay on `localhost` from the browser's point of view, not the Compose service name.
-
-Without `POSTGRES_HOST`, Django still uses SQLite so the venv workflow below keeps working.
-
-### Backend
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python manage.py migrate
-python manage.py runserver 0.0.0.0:8000
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-# NEXT_PUBLIC_API_BASE_URL defaults to http://localhost:8000/api
-npm run dev
-```
-
-Visit `http://localhost:3000` in your web browser to run it.
-
 ## Deliverables
 
 source code
@@ -221,3 +180,33 @@ if front-end was implemented, record and share a brief video (max 2 minutes) dem
 ## Optional Bonus
 
 Authentication using JWT is not required but welcome if time allows.
+
+## Implementation
+
+The sections above are the challenge. This section is what was built. How to run and seed the app is in `IMPLEMENTATION.md`. Assumptions are in `ASSUMPTIONS.md`. Request flows are in `FLOW.md`.
+
+### What is in place
+
+- Models, migration, and CRUD for offices, vehicles, mechanics, and maintenance records.
+- Office summary, vehicle search, vehicle detail, maintenance history, assign, mechanic workload, needs-maintenance, and the duplicate check.
+- Validation errors with HTTP status codes.
+- Faker seed command: `python manage.py seed_fleet`. Demo API login is `fleet` / `fleet-demo`.
+- API tests in `fleet/tests.py`.
+- Frontend for vehicle search, create, edit, assign, and needs-maintenance.
+- Optional JWT. The access token lasts 15 minutes and stays in memory. The refresh token lasts 1 day in the `httpOnly` cookie `fleet_refresh`.
+
+### Also included
+
+- Unfold admin at `/admin/`, with fleet charts and a fleet login photo. Admin needs `createsuperuser`. The seed user is not staff.
+- Swagger UI at `http://localhost:8000/api/docs/`.
+- Postman collection in `postman_collection.json`. Import it, run **Login** first, then the other requests in order.
+
+### Tradeoffs
+
+- Summary and workload are plain lists. Search, needs-maintenance, and CRUD lists are paginated.
+- Office summary uses separate totals per office so a join cannot multiply maintenance cost.
+- Vehicle detail prefetches history so a vehicle with hundreds of records stays a small number of queries.
+- Assign updates only the office.
+- The access token stays in memory. The refresh token stays in an `httpOnly` cookie, so a reload can sign the user back in.
+
+

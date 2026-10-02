@@ -1,0 +1,233 @@
+{
+  "info": {
+    "name": "Fleet Tracker API",
+    "description": "Run Login first, then the other requests in order. Seed the database before running. Base URL is http://localhost:8000.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:8000"},
+    {"key": "access", "value": ""},
+    {"key": "vehicle_id", "value": ""},
+    {"key": "office_id", "value": ""}
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {"key": "token", "value": "{{access}}", "type": "string"}
+    ]
+  },
+  "item": [
+    {
+      "name": "Login",
+      "request": {
+        "auth": {"type": "noauth"},
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"fleet\",\n  \"password\": \"fleet-demo\"\n}"
+        },
+        "url": "{{base_url}}/api/auth/token/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('login returns an access token', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(body.access).to.be.a('string').and.not.empty;",
+              "  pm.expect(body.refresh).to.be.undefined;",
+              "});",
+              "pm.collectionVariables.set('access', body.access);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "List offices",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/offices/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('offices are returned', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(body.results.length).to.be.above(1);",
+              "});",
+              "pm.collectionVariables.set('office_id', body.results[1].id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Find heavy vehicle",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/vehicles/?page=2",
+          "host": ["{{base_url}}"],
+          "path": ["api", "vehicles", ""],
+          "query": [{"key": "page", "value": "2"}]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "const heavy = body.results.find((vehicle) => vehicle.vin === '1FAKE000000000016');",
+              "pm.test('heavy vehicle is on page 2', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(heavy).to.be.an('object');",
+              "});",
+              "pm.collectionVariables.set('vehicle_id', String(heavy.id));",
+              "const offices = pm.collectionVariables.get('office_id');",
+              "if (String(heavy.office) === String(offices)) {",
+              "  pm.collectionVariables.set('office_id', String(body.results.find((vehicle) => String(vehicle.office) !== String(heavy.office)).office));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Maintenance history",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/vehicles/{{vehicle_id}}/maintenance/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const rows = pm.response.json();",
+              "pm.test('history is newest first', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(rows.length).to.be.above(1);",
+              "  pm.expect(rows[0].maintenance_date >= rows[1].maintenance_date).to.be.true;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Assign office",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"office\": {{office_id}}\n}"
+        },
+        "url": "{{base_url}}/api/vehicles/{{vehicle_id}}/assign/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('only the office changes', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(body.vin).to.eql('1FAKE000000000016');",
+              "  pm.expect(String(body.office)).to.eql(pm.collectionVariables.get('office_id'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mechanic workload",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/mechanics/workload/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const rows = pm.response.json();",
+              "pm.test('busiest mechanic is first', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(rows[0].maintenance_count).to.be.at.least(rows[rows.length - 1].maintenance_count);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Needs maintenance",
+      "request": {
+        "method": "GET",
+        "url": "{{base_url}}/api/vehicles/needs-maintenance/"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('never-serviced vehicles come first', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(body.results[0].last_maintenance).to.eql(null);",
+              "  pm.expect(body.results[0].is_active).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Duplicate check",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{base_url}}/api/vehicles/check-duplicate/?vin=1FAKE000000000001&license_plate=PLT00016",
+          "host": ["{{base_url}}"],
+          "path": ["api", "vehicles", "check-duplicate", ""],
+          "query": [
+            {"key": "vin", "value": "1FAKE000000000001"},
+            {"key": "license_plate", "value": "PLT00016"}
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const body = pm.response.json();",
+              "pm.test('vin and license plate conflict', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(body.conflicts).to.eql(['vin', 'license_plate']);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

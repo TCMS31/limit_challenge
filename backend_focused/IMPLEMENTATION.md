@@ -175,14 +175,7 @@ Tests use Django's test database. They do not write to the Compose database you 
 
 ## Assumptions
 
-- Maintenance type is `oil_change`, `inspection`, `repair`, or `tires`.
-- "Last 12 months" on the office summary, and on the admin cost chart, is a rolling 365 days ending today.
-- Mechanic workload uses the current calendar year, from January 1 through today.
-- A license plate is unique only among active vehicles. Inactive vehicles may share one.
-- Deleting an office, vehicle, or mechanic that still has related rows is rejected. Remove or reassign those rows first.
-- Make and model search matches a case-insensitive fragment, because those filters are free-text boxes.
-- The API requires JWT even though the challenge said authentication was unnecessary. `/healthz/` stays public.
-- The demo API user is created by `seed_fleet`
+See `ASSUMPTIONS.md`.
 
 ## Tradeoffs
 
