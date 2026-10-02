@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from django.db.models import (
@@ -14,14 +14,41 @@ from django.db.models import (
     Subquery,
     Sum,
 )
-from django.db.models.functions import Coalesce
+from django.db.models.functions import Coalesce, TruncMonth
 from django.utils import timezone
 
 from fleet.models import MaintenanceRecord, Mechanic, Office, Vehicle
 
+WORKLOAD_CHART_LIMIT = 10
+
+
+def rolling_year_start():
+    return timezone.localdate() - timedelta(days=365)
+
+
+def _month_start(value):
+    if isinstance(value, datetime):
+        if timezone.is_aware(value):
+            value = timezone.localtime(value)
+        value = value.date()
+    return value.replace(day=1)
+
+
+def _months_from(start, end):
+    cursor = _month_start(start)
+    last = _month_start(end)
+    months = []
+    while cursor <= last:
+        months.append(cursor)
+        if cursor.month == 12:
+            cursor = date(cursor.year + 1, 1, 1)
+        else:
+            cursor = date(cursor.year, cursor.month + 1, 1)
+    return months
+
 
 def office_summaries():
-    start = timezone.localdate() - timedelta(days=365)
+    start = rolling_year_start()
     active_count = (
         Vehicle.objects.filter(office=OuterRef("pk"), is_active=True)
         .order_by()
@@ -77,9 +104,9 @@ def search_vehicles(
     if is_active is not None:
         queryset = queryset.filter(is_active=is_active)
     if make:
-        queryset = queryset.filter(make__iexact=make)
+        queryset = queryset.filter(make__icontains=make)
     if model:
-        queryset = queryset.filter(model__iexact=model)
+        queryset = queryset.filter(model__icontains=model)
 
     maintenance = MaintenanceRecord.objects.filter(vehicle=OuterRef("pk"))
     has_maintenance_filter = False
@@ -110,6 +137,37 @@ def vehicles_needing_maintenance():
     )
 
 
+def active_vehicles_by_office():
+    return (
+        Office.objects.annotate(
+            active_count=Count("vehicles", filter=Q(vehicles__is_active=True))
+        ).order_by("name", "id")
+    )
+
+
+def maintenance_cost_by_month():
+    """Monthly totals for the same rolling year as office summaries."""
+    start = rolling_year_start()
+    rows = (
+        MaintenanceRecord.objects.filter(maintenance_date__gte=start)
+        .annotate(month=TruncMonth("maintenance_date"))
+        .values("month")
+        .annotate(total=Sum("cost"))
+    )
+    totals = {}
+    latest = timezone.localdate()
+    for row in rows:
+        month = _month_start(row["month"])
+        totals[month] = row["total"] or Decimal("0")
+        if month > latest:
+            latest = month
+    money = Decimal("0.01")
+    return [
+        (month, totals.get(month, Decimal("0")).quantize(money))
+        for month in _months_from(start, latest)
+    ]
+
+
 def mechanic_workloads():
     year = timezone.localdate().year
     this_year = Q(maintenance_records__maintenance_date__year=year)
@@ -122,6 +180,10 @@ def mechanic_workloads():
             output_field=money,
         ),
     ).order_by("-maintenance_count", "-maintenance_cost", "name")
+
+
+def top_mechanic_workloads(limit=WORKLOAD_CHART_LIMIT):
+    return mechanic_workloads()[:limit]
 
 
 def duplicate_conflicts(*, vin, license_plate, exclude_id=None):

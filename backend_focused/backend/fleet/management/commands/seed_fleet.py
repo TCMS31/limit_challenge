@@ -1,6 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -51,6 +52,8 @@ class Command(BaseCommand):
         if vehicles_count < 5:
             raise CommandError("Create at least 5 vehicles so the sample cases fit.")
 
+        self._ensure_demo_user(reset_password=options["clear"])
+
         if self._fleet_has_rows() and not options["clear"]:
             raise CommandError("Fleet tables already have rows. Re-run with --clear.")
 
@@ -81,6 +84,14 @@ class Command(BaseCommand):
             )
         )
         self.stdout.write(f"Vehicle with {heavy_count} maintenance records: VIN {heavy.vin}")
+        self.stdout.write("Demo login: username fleet, password fleet-demo")
+
+    def _ensure_demo_user(self, *, reset_password):
+        user_model = get_user_model()
+        user, created = user_model.objects.get_or_create(username="fleet")
+        if created or reset_password:
+            user.set_password("fleet-demo")
+            user.save(update_fields=["password"])
 
     def _fleet_has_rows(self):
         return (

@@ -1,13 +1,22 @@
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from django.contrib.auth import get_user_model
 from django.db import connection
+from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from fleet.models import MaintenanceRecord, Mechanic, Office, Vehicle
+from fleet.queries import (
+    _month_start,
+    active_vehicles_by_office,
+    maintenance_cost_by_month,
+    office_summaries,
+    top_mechanic_workloads,
+)
 
 
 def days_ago(days):
@@ -24,6 +33,8 @@ def cost_window_dates():
 
 class FleetApiTests(APITestCase):
     def setUp(self):
+        user = get_user_model().objects.create_user(username="tester", password="secret-pass")
+        self.client.force_authenticate(user)
         self.office = Office.objects.create(name="North", city="Austin")
         self.other_office = Office.objects.create(name="South", city="Dallas")
         self.mechanic = Mechanic.objects.create(
@@ -216,6 +227,13 @@ class FleetApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual([row["id"] for row in response.data["results"]], [match.id])
 
+        partial = self.client.get(
+            "/api/vehicles/search/",
+            {"office": self.office.id, "make": "toy", "model": "cam"},
+        )
+        self.assertEqual(partial.status_code, status.HTTP_200_OK)
+        self.assertEqual([row["id"] for row in partial.data["results"]], [match.id])
+
     def test_invalid_maintenance_cost_returns_a_message(self):
         vehicle = self.vehicle()
         response = self.client.post(
@@ -250,3 +268,169 @@ class FleetApiTests(APITestCase):
         )
         self.assertEqual(response.data["maintenance_records"][0]["mechanic"]["name"], "Ada")
         self.assertLessEqual(len(captured.captured_queries), 5)
+
+
+class JwtAuthTests(APITestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(username="fleet", password="fleet-demo")
+        self.office = Office.objects.create(name="North", city="Austin")
+
+    def test_fleet_api_requires_a_token(self):
+        response = self.client.get("/api/offices/")
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_health_check_stays_public(self):
+        response = self.client.get("/healthz/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    def test_bad_password_is_rejected(self):
+        response = self.client.post(
+            "/api/auth/token/",
+            {"username": "fleet", "password": "wrong-password"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_valid_token_can_create_a_vehicle(self):
+        token = self.client.post(
+            "/api/auth/token/",
+            {"username": "fleet", "password": "fleet-demo"},
+            format="json",
+        )
+        self.assertEqual(token.status_code, status.HTTP_200_OK)
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token.data['access']}")
+        response = self.client.post(
+            "/api/vehicles/",
+            {
+                "vin": "1FAKE000000000077",
+                "license_plate": "JWT0001",
+                "make": "Toyota",
+                "model": "Camry",
+                "year": 2022,
+                "office": self.office.id,
+                "is_active": True,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertNotIn("refresh", token.data)
+        self.assertTrue(token.cookies["fleet_refresh"]["httponly"])
+
+    def test_refresh_cookie_issues_a_new_access_token(self):
+        login = self.client.post(
+            "/api/auth/token/",
+            {"username": "fleet", "password": "fleet-demo"},
+            format="json",
+        )
+        self.assertEqual(login.status_code, status.HTTP_200_OK)
+
+        refreshed = self.client.post("/api/auth/token/refresh/", {}, format="json")
+        self.assertEqual(refreshed.status_code, status.HTTP_200_OK)
+        self.assertIn("access", refreshed.data)
+        self.assertNotIn("refresh", refreshed.data)
+        self.assertNotEqual(refreshed.data["access"], login.data["access"])
+
+    def test_logout_blacklists_the_refresh_cookie(self):
+        self.client.post(
+            "/api/auth/token/",
+            {"username": "fleet", "password": "fleet-demo"},
+            format="json",
+        )
+        refresh = self.client.cookies["fleet_refresh"].value
+        logout = self.client.post("/api/auth/logout/", {}, format="json")
+        self.assertEqual(logout.status_code, status.HTTP_204_NO_CONTENT)
+
+        self.client.cookies["fleet_refresh"] = refresh
+        reused = self.client.post("/api/auth/token/refresh/", {}, format="json")
+        self.assertEqual(reused.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class DashboardQueryTests(TestCase):
+    def setUp(self):
+        self.office = Office.objects.create(name="North", city="Austin")
+        self.other_office = Office.objects.create(name="South", city="Dallas")
+        self.mechanic = Mechanic.objects.create(
+            name="Ada",
+            certification_number="ASE-00001",
+        )
+        self.vehicle = Vehicle.objects.create(
+            vin="1FAKE000000000001",
+            license_plate="PLT00001",
+            make="Toyota",
+            model="Camry",
+            year=2020,
+            office=self.office,
+            is_active=True,
+        )
+
+    def record(self, maintenance_date, cost="10.00", mechanic=None, vehicle=None):
+        return MaintenanceRecord.objects.create(
+            vehicle=vehicle or self.vehicle,
+            mechanic=mechanic or self.mechanic,
+            maintenance_date=maintenance_date,
+            maintenance_type="repair",
+            cost=Decimal(cost),
+            notes="",
+        )
+
+    def test_month_buckets_stay_dates_when_truncation_returns_a_datetime(self):
+        aware = timezone.make_aware(datetime(2026, 3, 1, 0, 0))
+        self.assertEqual(_month_start(aware), timezone.localtime(aware).date().replace(day=1))
+        self.assertEqual(_month_start(date(2026, 3, 15)), date(2026, 3, 1))
+
+    def test_monthly_cost_matches_the_rolling_office_summary(self):
+        today, previous_year, outside = cost_window_dates()
+        self.record(today, "50.00")
+        if previous_year is not None:
+            self.record(previous_year, "25.00")
+        self.record(outside, "999.00")
+
+        months = dict(maintenance_cost_by_month())
+        self.assertEqual(months[today.replace(day=1)], Decimal("50.00"))
+        if previous_year is not None:
+            self.assertEqual(months[previous_year.replace(day=1)], Decimal("25.00"))
+        self.assertNotIn(Decimal("999.00"), months.values())
+
+        chart_total = sum(months.values(), Decimal("0"))
+        office_total = sum(
+            (office.maintenance_cost_last_year for office in office_summaries()),
+            Decimal("0"),
+        )
+        self.assertEqual(chart_total, office_total)
+
+    def test_active_vehicle_counts_match_the_office_summary(self):
+        Vehicle.objects.create(
+            vin="1FAKE000000000002",
+            license_plate="PLT00002",
+            make="Ford",
+            model="Focus",
+            year=2019,
+            office=self.office,
+            is_active=False,
+        )
+        Vehicle.objects.create(
+            vin="1FAKE000000000003",
+            license_plate="PLT00003",
+            make="Honda",
+            model="Civic",
+            year=2021,
+            office=self.other_office,
+            is_active=True,
+        )
+
+        chart = {office.id: office.active_count for office in active_vehicles_by_office()}
+        summary = {
+            office.id: office.active_vehicle_count for office in office_summaries()
+        }
+        self.assertEqual(chart, summary)
+        self.assertEqual(chart[self.office.id], 1)
+        self.assertEqual(chart[self.other_office.id], 1)
+
+    def test_workload_chart_keeps_the_busiest_mechanics(self):
+        other = Mechanic.objects.create(name="Bea", certification_number="ASE-00002")
+        self.record(days_ago(1), cost="10.00")
+        self.record(days_ago(2), cost="10.00", mechanic=other)
+        self.record(days_ago(3), cost="10.00", mechanic=other)
+
+        rows = list(top_mechanic_workloads(limit=1))
+        self.assertEqual([row.name for row in rows], ["Bea"])

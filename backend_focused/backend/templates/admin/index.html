@@ -1,0 +1,27 @@
+{% extends 'admin/base.html' %}
+
+{% load unfold %}
+
+{% block branding %}
+    {% include "unfold/helpers/site_branding.html" %}
+{% endblock %}
+
+{% block content %}
+    {% component "unfold/components/container.html" %}
+        {% component "unfold/components/flex.html" with class="flex-col gap-8" %}
+            {% component "unfold/components/card.html" with title="Active vehicles by office" %}
+                {% component "unfold/components/chart/bar.html" with component_class="ActiveVehiclesChart" %}{% endcomponent %}
+            {% endcomponent %}
+
+            {% component "unfold/components/card.html" with title="Maintenance cost, rolling 12 months" %}
+                {% component "unfold/components/chart/bar.html" with component_class="MaintenanceCostChart" %}{% endcomponent %}
+            {% endcomponent %}
+
+            {% component "unfold/components/card.html" with title="Mechanic workload this year" %}
+                {% component "unfold/components/chart/bar.html" with component_class="MechanicWorkloadChart" %}{% endcomponent %}
+            {% endcomponent %}
+        {% endcomponent %}
+    {% endcomponent %}
+
+    {% include "unfold/helpers/dashboard_default.html" %}
+{% endblock %}
