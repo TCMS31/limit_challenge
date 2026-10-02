@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'corsheaders',
     'rest_framework',
+    'drf_spectacular',
     'django_filters',
     'submissions',
 ]
@@ -159,6 +160,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_RENDERER_CLASSES': [
         'djangorestframework_camel_case.render.CamelCaseJSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
@@ -172,6 +174,17 @@ REST_FRAMEWORK = {
 
 JSON_UNDERSCOREIZE = {
     'no_underscore_before_number': True,
+}
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Submission Tracker API',
+    'DESCRIPTION': 'Read-only API for reviewing broker submissions.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'POSTPROCESSING_HOOKS': [
+        'drf_spectacular.hooks.postprocess_schema_enums',
+        'drf_spectacular.contrib.djangorestframework_camel_case.camelize_serializer_fields',
+    ],
 }
 
 CORS_ALLOW_ALL_ORIGINS = True

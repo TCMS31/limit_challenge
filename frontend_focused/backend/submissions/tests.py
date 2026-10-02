@@ -173,3 +173,18 @@ class SubmissionApiTests(APITestCase):
             [broker["name"] for broker in payload],
             ["Harbor & Co Brokerage", "Summit Specialty Brokers"],
         )
+
+
+class ApiDocsTests(APITestCase):
+    def test_openapi_schema_uses_camel_case(self):
+        response = self.client.get("/api/schema/?format=json")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        schema = response.content.decode()
+        self.assertIn("companySearch", schema)
+        self.assertIn("legalName", schema)
+
+    def test_swagger_ui_is_available(self):
+        response = self.client.get("/api/docs/")
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)

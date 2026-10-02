@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from . import models
@@ -39,6 +40,12 @@ class NoteSerializer(serializers.ModelSerializer):
         fields = ["id", "author_name", "body", "created_at"]
 
 
+class NoteSummarySerializer(serializers.Serializer):
+    author_name = serializers.CharField(allow_null=True)
+    body_preview = serializers.CharField()
+    created_at = serializers.DateTimeField(allow_null=True)
+
+
 class SubmissionListSerializer(serializers.ModelSerializer):
     broker = BrokerSerializer(read_only=True)
     company = CompanySerializer(read_only=True)
@@ -64,6 +71,7 @@ class SubmissionListSerializer(serializers.ModelSerializer):
             "latest_note",
         ]
 
+    @extend_schema_field(NoteSummarySerializer(allow_null=True))
     def get_latest_note(self, obj):
         author = getattr(obj, "latest_note_author", None)
         body = getattr(obj, "latest_note_body", None)

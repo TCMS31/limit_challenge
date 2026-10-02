@@ -94,7 +94,7 @@ python manage.py seed_submissions  # optional but recommended
 python manage.py runserver 0.0.0.0:8000
 ```
 
-Open the API at `http://localhost:8000/api/submissions/` (use `localhost`, not `0.0.0.0`).
+Open the API at `http://localhost:8000/api/submissions/` and the Swagger UI at `http://localhost:8000/api/docs/` (use `localhost`, not `0.0.0.0`).
 
 ### Frontend
 
