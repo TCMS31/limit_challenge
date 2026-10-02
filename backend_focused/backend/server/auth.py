@@ -1,5 +1,6 @@
 from django.conf import settings
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -31,6 +32,12 @@ def _clear_refresh_cookie(response):
 
 
 class CookieTokenObtainPairView(TokenObtainPairView):
+    @extend_schema(
+        responses=inline_serializer(
+            name="AccessTokenResponse",
+            fields={"access": serializers.CharField()},
+        )
+    )
     def post(self, request, *args, **kwargs):
         response = super().post(request, *args, **kwargs)
         refresh = response.data.get("refresh")
@@ -41,6 +48,14 @@ class CookieTokenObtainPairView(TokenObtainPairView):
 
 
 class CookieTokenRefreshView(TokenRefreshView):
+    @extend_schema(
+        request=None,
+        responses=inline_serializer(
+            name="RefreshedAccessToken",
+            fields={"access": serializers.CharField()},
+        ),
+        description="Reads the fleet_refresh cookie. The body is empty.",
+    )
     def post(self, request, *args, **kwargs):
         refresh = request.COOKIES.get(REFRESH_COOKIE, "")
         serializer = self.get_serializer(data={"refresh": refresh})
@@ -65,6 +80,7 @@ class CookieLogoutView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    @extend_schema(request=None, responses={204: None}, description="Clears the fleet_refresh cookie.")
     def post(self, request):
         refresh = request.COOKIES.get(REFRESH_COOKIE)
         if refresh:

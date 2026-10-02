@@ -3,6 +3,9 @@ from datetime import date
 from django.db import IntegrityError
 from django.db.models import Prefetch
 from django.db.models.deletion import ProtectedError
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -89,6 +92,18 @@ def parse_date(value, field):
         raise ValidationError({field: "Use YYYY-MM-DD."}) from exc
 
 
+def paginated_response(name, serializer):
+    return inline_serializer(
+        name=name,
+        fields={
+            "count": serializers.IntegerField(),
+            "next": serializers.CharField(allow_null=True),
+            "previous": serializers.CharField(allow_null=True),
+            "results": serializer(many=True),
+        },
+    )
+
+
 def parse_int(value, field):
     if value is None or value == "":
         return None
@@ -102,6 +117,7 @@ class OfficeViewSet(IntegrityProtectedMixin, ModelViewSet):
     queryset = Office.objects.all()
     serializer_class = OfficeSerializer
 
+    @extend_schema(responses=OfficeSummarySerializer(many=True))
     @action(detail=False, methods=["get"])
     def summary(self, request):
         serializer = OfficeSummarySerializer(office_summaries(), many=True)
@@ -131,6 +147,18 @@ class VehicleViewSet(IntegrityProtectedMixin, ModelViewSet):
             return VehicleMaintenanceStatusSerializer
         return VehicleSerializer
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("office", OpenApiTypes.INT, required=False),
+            OpenApiParameter("active", OpenApiTypes.BOOL, required=False),
+            OpenApiParameter("make", OpenApiTypes.STR, required=False),
+            OpenApiParameter("model", OpenApiTypes.STR, required=False),
+            OpenApiParameter("maintained_after", OpenApiTypes.DATE, required=False),
+            OpenApiParameter("maintained_before", OpenApiTypes.DATE, required=False),
+            OpenApiParameter("certification_number", OpenApiTypes.STR, required=False),
+        ],
+        responses=paginated_response("PaginatedVehicle", VehicleSerializer),
+    )
     @action(detail=False, methods=["get"])
     def search(self, request):
         maintained_after = parse_date(request.query_params.get("maintained_after"), "maintained_after")
@@ -157,12 +185,14 @@ class VehicleViewSet(IntegrityProtectedMixin, ModelViewSet):
         )
         return self._paginated(queryset)
 
+    @extend_schema(responses=MaintenanceDetailSerializer(many=True))
     @action(detail=True, methods=["get"])
     def maintenance(self, request, pk=None):
         vehicle = self.get_object()
         serializer = MaintenanceDetailSerializer(vehicle.maintenance_records.all(), many=True)
         return Response(serializer.data)
 
+    @extend_schema(request=AssignOfficeSerializer, responses=VehicleSerializer)
     @action(detail=True, methods=["post"])
     def assign(self, request, pk=None):
         vehicle = self.get_object()
@@ -172,10 +202,27 @@ class VehicleViewSet(IntegrityProtectedMixin, ModelViewSet):
         vehicle.save(update_fields=["office"])
         return Response(VehicleSerializer(vehicle).data)
 
+    @extend_schema(
+        responses=paginated_response(
+            "PaginatedMaintenanceStatus",
+            VehicleMaintenanceStatusSerializer,
+        )
+    )
     @action(detail=False, methods=["get"], url_path="needs-maintenance")
     def needs_maintenance(self, request):
         return self._paginated(vehicles_needing_maintenance())
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter("vin", OpenApiTypes.STR, required=False),
+            OpenApiParameter("license_plate", OpenApiTypes.STR, required=False),
+            OpenApiParameter("exclude", OpenApiTypes.INT, required=False, description="Vehicle id to ignore."),
+        ],
+        responses=inline_serializer(
+            name="DuplicateCheck",
+            fields={"conflicts": serializers.ListField(child=serializers.CharField())},
+        ),
+    )
     @action(detail=False, methods=["get"], url_path="check-duplicate")
     def check_duplicate(self, request):
         vin = request.query_params.get("vin", "").strip()
@@ -201,6 +248,7 @@ class MechanicViewSet(IntegrityProtectedMixin, ModelViewSet):
     queryset = Mechanic.objects.all()
     serializer_class = MechanicSerializer
 
+    @extend_schema(responses=MechanicWorkloadSerializer(many=True))
     @action(detail=False, methods=["get"])
     def workload(self, request):
         serializer = MechanicWorkloadSerializer(mechanic_workloads(), many=True)

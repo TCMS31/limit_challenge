@@ -283,6 +283,13 @@ class JwtAuthTests(APITestCase):
         response = self.client.get("/healthz/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
+    def test_swagger_docs_are_public(self):
+        schema = self.client.get("/api/schema/")
+        docs = self.client.get("/api/docs/")
+        self.assertEqual(schema.status_code, status.HTTP_200_OK)
+        self.assertIn("/api/vehicles/search/", schema.content.decode())
+        self.assertEqual(docs.status_code, status.HTTP_200_OK)
+
     def test_bad_password_is_rejected(self):
         response = self.client.post(
             "/api/auth/token/",

@@ -78,6 +78,7 @@ These pieces are outside the challenge checklist.
 | JWT | Optional in the challenge. Documented in the next section. |
 | Django admin | Unfold theme at `/admin/`. Staff only. The home page charts active vehicles by office, maintenance cost over the same rolling year as the office summary, and the ten busiest mechanics this year. The model list and recent actions stay on that page. |
 | SQLite fallback | If `POSTGRES_HOST` is unset, Django uses SQLite so `runserver` works without Compose. |
+| Swagger | `drf-spectacular` publishes the OpenAPI schema at `/api/schema/` and Swagger UI at `/api/docs/`. Both are public. Authorize with the access token from login. |
 
 ### JWT
 

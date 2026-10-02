@@ -1,7 +1,11 @@
 from django.contrib import admin
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from unfold.admin import ModelAdmin
 
 from fleet.models import MaintenanceRecord, Mechanic, Office, Vehicle
+
+admin.site.unregister(OutstandingToken)
+admin.site.unregister(BlacklistedToken)
 
 
 @admin.register(Office)
