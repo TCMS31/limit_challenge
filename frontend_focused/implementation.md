@@ -2,7 +2,7 @@
 
 This is a read-only workspace for reviewing broker-submitted opportunities. An operator filters the list, opens one submission, and inspects the company, broker, owner, contacts, documents, and notes. The app does not create or edit records.
 
-The domain diagram is in `docs/submission-flow.md`.
+The domain diagram is in `docs/submission-flow.md`. The walkthrough is at https://www.loom.com/share/0c5c47b05746477699ab1c6472e03e62.
 
 ## How to run
 

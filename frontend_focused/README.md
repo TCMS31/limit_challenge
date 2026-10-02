@@ -80,7 +80,7 @@ How to run the app is in `implementation.md`.
 ## Submission Instructions
 
 - Provide a short README update summarizing approach, tradeoffs, and how to run the solution.
-- Record and share a brief screen capture (max 2 minutes) demonstrating the frontend working end-to-end with the backend.
+- Record and share a brief screen capture (max 2 minutes) demonstrating the frontend working end-to-end with the backend. Walkthrough: https://www.loom.com/share/0c5c47b05746477699ab1c6472e03e62
 - Call out any stretch goals implemented.
 - Automated tests are optional, but including targeted backend or frontend tests is a strong signal.
 
